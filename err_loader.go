@@ -48,9 +48,9 @@ func (e Error) Error() string {
 		}
 		if message, ok := e.localMessages[Language]; ok {
 			return message
+		} else {
+			return e.localMessages[DafaultLocale]
 		}
-
-		return e.err.Error()
 	}
 
 	return fmt.Sprintf("validator: something went wrong (code: %d)", e.code)
