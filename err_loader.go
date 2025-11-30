@@ -26,6 +26,10 @@ type (
 	}
 )
 
+var (
+	Language LanguageCode
+)
+
 func NewErrYamlPackage() DictionaryPack {
 	return DictionaryPack{
 		Errors:   make(map[string]map[LanguageCode]string),
@@ -39,7 +43,10 @@ func (e Error) Code() ErrCode {
 
 func (e Error) Error() string {
 	if e.err != nil {
-		if message, ok := e.localMessages[English]; ok {
+		if Language == "" {
+			Language = DafaultLocale
+		}
+		if message, ok := e.localMessages[Language]; ok {
 			return message
 		}
 
@@ -93,4 +100,8 @@ func (d *DictionaryPack) New(key string) Error {
 	}
 
 	return err
+}
+
+func SetLanguage(lang string) {
+	Language = LanguageCode(lang)
 }

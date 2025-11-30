@@ -13,6 +13,7 @@ type (
 )
 
 var (
-	Indonesia LanguageCode = LanguageCode(language.Indonesian.String())
-	English   LanguageCode = LanguageCode(language.English.String())
+	Indonesia     LanguageCode = LanguageCode(language.Indonesian.String())
+	English       LanguageCode = LanguageCode(language.English.String())
+	DafaultLocale LanguageCode = English
 )
