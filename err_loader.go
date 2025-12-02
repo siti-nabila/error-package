@@ -45,17 +45,20 @@ func (e Error) Code() ErrCode {
 
 func (e Error) Error() string {
 	if e.err != nil {
-		if Language == "" {
-			Language = DafaultLocale
-		}
-		if message, ok := e.localMessages[Language]; ok {
-			return message
-		} else {
-			return e.localMessages[DafaultLocale]
-		}
+		return e.localizedMessage(Language)
 	}
 
 	return fmt.Sprintf("validator: something went wrong (code: %d)", e.code)
+}
+
+func (e Error) localizedMessage(lang LanguageCode) string {
+	if lang == "" {
+		lang = DafaultLocale
+	}
+	if msg, ok := e.localMessages[lang]; ok {
+		return msg
+	}
+	return e.localMessages[DafaultLocale]
 }
 
 func (d *DictionaryPack) LoadBytes(data []byte) error {
@@ -120,13 +123,37 @@ func (errs Errors) Error() string {
 		if i > 0 {
 			b.WriteString("; ")
 		}
-		b.WriteString(formatErrorString(key, errs[key]))
+		b.WriteString(formatErrorEntry(key, errs[key]))
 	}
 
 	b.WriteString(".")
 	return b.String()
 }
+func (errs Errors) LocalizedError(lang LanguageCode) map[string]any {
+	if len(errs) == 0 {
+		return map[string]any{}
+	}
 
+	result := make(map[string]any)
+	for key, err := range errs {
+		result[key] = localizeErrValue(err, lang)
+	}
+	return result
+}
+
+func localizeErrValue(err error, lang LanguageCode) any {
+	switch e := err.(type) {
+
+	case Errors:
+		return e.LocalizedError(lang)
+
+	case Error:
+		return e.localizedMessage(lang)
+
+	default:
+		return err.Error()
+	}
+}
 func sortedKeys(m map[string]error) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -136,17 +163,20 @@ func sortedKeys(m map[string]error) []string {
 	return keys
 }
 
-func formatErrorString(key string, err error) string {
+func formatErrorEntry(key string, err error) string {
 	switch e := err.(type) {
 
 	case Errors:
+		// nested Errors
 		return fmt.Sprintf("%s: (%s)", key, e.Error())
 
 	case Error:
-		// Error() sudah mengambil Language global
-		return fmt.Sprintf("%s: %s", key, e.Error())
+		// custom Error type with localization
+		msg := e.Error() // already localized based on global Language
+		return fmt.Sprintf("%s: %s", key, msg)
 
 	default:
-		return fmt.Sprintf("%s: %s", key, e.Error())
+		// fallback
+		return fmt.Sprintf("%s: %s", key, err.Error())
 	}
 }
