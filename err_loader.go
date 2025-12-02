@@ -3,6 +3,8 @@ package errorpackage
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -104,4 +106,47 @@ func (d *DictionaryPack) New(key string) Error {
 
 func SetLanguage(lang string) {
 	Language = LanguageCode(lang)
+}
+
+func (errs Errors) Error() string {
+	if len(errs) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	keys := sortedKeys(errs)
+
+	for i, key := range keys {
+		if i > 0 {
+			b.WriteString("; ")
+		}
+		b.WriteString(formatErrorString(key, errs[key]))
+	}
+
+	b.WriteString(".")
+	return b.String()
+}
+
+func sortedKeys(m map[string]error) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func formatErrorString(key string, err error) string {
+	switch e := err.(type) {
+
+	case Errors:
+		return fmt.Sprintf("%s: (%s)", key, e.Error())
+
+	case Error:
+		// Error() sudah mengambil Language global
+		return fmt.Sprintf("%s: %s", key, e.Error())
+
+	default:
+		return fmt.Sprintf("%s: %s", key, e.Error())
+	}
 }
