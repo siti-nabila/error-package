@@ -147,20 +147,16 @@ func (errs Errors) LocalizedError() map[string]any {
 func (e Errors) Add(field string, err error) {
 	e[field] = append(e[field], err)
 }
-
-func localizeErrValue(err error, lang string) any {
-	switch e := err.(type) {
-
-	case Errors:
-		return e.LocalizedError()
-
-	case Error:
-		return e.localizedMessage()
-
-	default:
-		return err.Error()
+func (errs Errors) Merge(other Errors) {
+	for field, list := range other {
+		errs[field] = append(errs[field], list...)
 	}
 }
+
+func (errs Errors) Empty() bool {
+	return len(errs) == 0
+}
+
 func sortedKeys(m Errors) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
