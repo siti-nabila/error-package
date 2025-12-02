@@ -16,7 +16,7 @@ type (
 		Messages []LangPack
 	}
 
-	Errors         map[string]error
+	Errors         map[string][]error
 	DictionaryPack struct {
 		Errors   map[string]map[LanguageCode]string `yaml:"errors"`
 		Packages map[string]ErrPack
@@ -45,17 +45,17 @@ func (e Error) Code() ErrCode {
 
 func (e Error) Error() string {
 	if e.err != nil {
-		return e.localizedMessage(Language)
+		return e.localizedMessage()
 	}
 
 	return fmt.Sprintf("validator: something went wrong (code: %d)", e.code)
 }
 
-func (e Error) localizedMessage(lang LanguageCode) string {
-	if lang == "" {
-		lang = DafaultLocale
+func (e Error) localizedMessage() string {
+	if Language == "" {
+		Language = DafaultLocale
 	}
-	if msg, ok := e.localMessages[lang]; ok {
+	if msg, ok := e.localMessages[Language]; ok {
 		return msg
 	}
 	return e.localMessages[DafaultLocale]
@@ -123,38 +123,45 @@ func (errs Errors) Error() string {
 		if i > 0 {
 			b.WriteString("; ")
 		}
-		b.WriteString(formatErrorEntry(key, errs[key]))
+
+		// Format value (slice of errors)
+		b.WriteString(formatErrorList(key, errs[key]))
 	}
 
 	b.WriteString(".")
 	return b.String()
 }
-func (errs Errors) LocalizedError(lang LanguageCode) map[string]any {
+func (errs Errors) LocalizedError() map[string]any {
 	if len(errs) == 0 {
 		return map[string]any{}
 	}
 
 	result := make(map[string]any)
-	for key, err := range errs {
-		result[key] = localizeErrValue(err, lang)
+
+	for key, list := range errs {
+		result[key] = localizeErrorList(list, Language)
 	}
+
 	return result
 }
+func (e Errors) Add(field string, err error) {
+	e[field] = append(e[field], err)
+}
 
-func localizeErrValue(err error, lang LanguageCode) any {
+func localizeErrValue(err error, lang string) any {
 	switch e := err.(type) {
 
 	case Errors:
-		return e.LocalizedError(lang)
+		return e.LocalizedError()
 
 	case Error:
-		return e.localizedMessage(lang)
+		return e.localizedMessage()
 
 	default:
 		return err.Error()
 	}
 }
-func sortedKeys(m map[string]error) []string {
+func sortedKeys(m Errors) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
@@ -163,20 +170,60 @@ func sortedKeys(m map[string]error) []string {
 	return keys
 }
 
-func formatErrorEntry(key string, err error) string {
+func formatErrorList(field string, list []error) string {
+	var b strings.Builder
+
+	if len(list) == 1 {
+		// Single error → tampilkan langsung
+		fmt.Fprintf(&b, "%s: %s", field, formatSingleError(list[0]))
+		return b.String()
+	}
+
+	// Multiple → tampilkan array
+	fmt.Fprintf(&b, "%s: [", field)
+	for i, err := range list {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(formatSingleError(err))
+	}
+	b.WriteString("]")
+
+	return b.String()
+}
+
+func formatSingleError(err error) string {
 	switch e := err.(type) {
-
 	case Errors:
-		// nested Errors
-		return fmt.Sprintf("%s: (%s)", key, e.Error())
-
-	case Error:
-		// custom Error type with localization
-		msg := e.Error() // already localized based on global Language
-		return fmt.Sprintf("%s: %s", key, msg)
-
+		return e.Error()
+	case Error: // custom error kamu
+		return e.Error()
 	default:
-		// fallback
-		return fmt.Sprintf("%s: %s", key, err.Error())
+		return err.Error()
+	}
+}
+
+func localizeErrorList(list []error, lang LanguageCode) any {
+	// Single error → langsung return string
+	if len(list) == 1 {
+		return localizeSingleError(list[0], lang)
+	}
+
+	// Multiple → array of strings or nested maps
+	arr := make([]any, len(list))
+	for i, err := range list {
+		arr[i] = localizeSingleError(err, lang)
+	}
+	return arr
+}
+
+func localizeSingleError(err error, lang LanguageCode) any {
+	switch e := err.(type) {
+	case Errors:
+		return e.LocalizedError()
+	case Error: // custom error kamu
+		return e.localizedMessage()
+	default:
+		return err.Error()
 	}
 }
