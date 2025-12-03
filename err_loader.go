@@ -107,6 +107,14 @@ func (d *DictionaryPack) New(key string) Error {
 	return err
 }
 
+func (d *DictionaryPack) Newf(key string, args ...any) Error {
+	e := d.New(key)
+	for code, msg := range e.localMessages {
+		e.localMessages[code] = fmt.Sprintf(msg, args...)
+	}
+	return e
+}
+
 func SetLanguage(lang string) {
 	Language = LanguageCode(lang)
 }
